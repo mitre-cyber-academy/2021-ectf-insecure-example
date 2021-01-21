@@ -1,0 +1,3 @@
+[submodule "controller/tiny-AES-c"]
+	path = controller/tiny-AES-c
+	url = git@github.com:kokke/tiny-AES-c.git
