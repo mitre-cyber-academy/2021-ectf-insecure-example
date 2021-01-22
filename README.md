@@ -15,7 +15,7 @@ running this code.
 The example code is structured as follows
 
 * `controller/` - Contains everything to build the SCEWL Bus Controller. See [Controller README](controller/README.md)
-* `cpu/` - Contains everythign to build the user code of the CPU. See [CPU README](cpu/README.md)
+* `cpu/` - Contains everything to build the user code of the CPU. See [CPU README](cpu/README.md)
 * `dockerfiles/` - Contains all Dockerfiles to build system
 * `radio/` - Contains the Radio Waves Emulator
 * `socks/` - Directory to hold sockets for the network backend
