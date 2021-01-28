@@ -266,7 +266,7 @@ And memory:
 
 ## 6. Capturing the flag
 With what you've learned, set a breakpoint at the first instruction of the
-`dispense_flag` function and continue up to there.
+`check_flag` function and continue up to there.
 
 `check_flag` has five arguments; let's check them out. The ARM calling convention
 is to place the first four arguments in registers and further arguments are
