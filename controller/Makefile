@@ -7,9 +7,7 @@
 # This source file is part of an example system for MITRE's 2021 Embedded System CTF (eCTF).
 # This code is being provided only for educational purposes for the 2021 MITRE eCTF competition,
 # and may not meet MITRE standards for quality. Use this code at your own risk!
-#
-# THIS FILE MUST NOT BE CHANGED IN YOUR SUBMISSION
-# You may only change it for your own debugging or testing
+
 
 # define the part type and base directory - must be defined for makedefs to work
 PART=LM3S6965
