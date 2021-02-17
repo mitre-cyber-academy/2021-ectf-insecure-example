@@ -22,7 +22,7 @@ from typing import List, NamedTuple, Optional, Dict
 Header = NamedTuple('Header', [('ty', bytes), ('tgt', int), ('src', int), ('len', int)])
 Message = NamedTuple('Message', [('hdr', Header), ('raw_hdr', bytes), ('body', bytes)])
 
-
+BRDCST_ID = 0
 SSS_ID = 1
 FAA_ID = 2
 
@@ -183,8 +183,8 @@ def poll(socks: Dict[int, ScewlSock], mitm: MitM, faa: ScewlSock, sock: ScewlSoc
 
     # send queued messages
     for msg in msgs:
-        # send directly to/from FAA transceiver
-        if FAA_ID in (msg.hdr.src, msg.hdr.tgt):
+        # send directly to/from FAA transceiver except for broadcasts
+        if FAA_ID in (msg.hdr.src, msg.hdr.tgt) and msg.hdr.tgt != BRDCST_ID:
             socks[msg.hdr.tgt].send_msg(msg)
         # otherwise broadcast to all SEDs
         else:
