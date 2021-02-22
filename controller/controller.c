@@ -34,56 +34,51 @@ int read_msg(intf_t *intf, char *data, scewl_id_t *src_id, scewl_id_t *tgt_id,
   scewl_hdr_t hdr;
   int read, max;
 
+  // clear buffer and header
+  memset(&hdr, 0, sizeof(hdr));
+  memset(data, 0, n);
+
+  // find header start
   do {
-    // clear buffer and header
-    memset(&hdr, 0, sizeof(hdr));
-    memset(data, 0, n);
+    hdr.magicC = 0;
 
-    // find header start
-    do {
-      hdr.magicC = 0;
-
-      if (intf_read(intf, (char *)&hdr.magicS, 1, blocking) == INTF_NO_DATA) {
-        return SCEWL_NO_MSG;
-      }
-
-      // check for SC
-      if (hdr.magicS == 'S') {
-        do {
-          if (intf_read(intf, (char *)&hdr.magicC, 1, blocking) == INTF_NO_DATA) {
-            return SCEWL_NO_MSG;
-          }
-        } while (hdr.magicC == 'S'); // in case of multiple 'S's in a row
-      }
-    } while (hdr.magicS != 'S' && hdr.magicC != 'C');
-
-    // read rest of header
-    read = intf_read(intf, (char *)&hdr + 2, sizeof(scewl_hdr_t) - 2, blocking);
-    if(read == INTF_NO_DATA) {
+    if (intf_read(intf, (char *)&hdr.magicS, 1, blocking) == INTF_NO_DATA) {
       return SCEWL_NO_MSG;
     }
 
-    // unpack header
-    *src_id = hdr.src_id;
-    *tgt_id = hdr.tgt_id;
-
-    // read body
-    max = hdr.len < n ? hdr.len : n;
-    read = intf_read(intf, data, max, blocking);
-
-    // throw away rest of message if too long
-    for (int i = 0; hdr.len > max && i < hdr.len - max; i++) {
-      intf_readb(intf, 0);
+    // check for SC
+    if (hdr.magicS == 'S') {
+      do {
+        if (intf_read(intf, (char *)&hdr.magicC, 1, blocking) == INTF_NO_DATA) {
+          return SCEWL_NO_MSG;
+        }
+      } while (hdr.magicC == 'S'); // in case of multiple 'S's in a row
     }
+  } while (hdr.magicS != 'S' && hdr.magicC != 'C');
 
-    // report if not blocking and full message not received
-    if(read == INTF_NO_DATA || read < max) {
-      return SCEWL_NO_MSG;
-    }
+  // read rest of header
+  read = intf_read(intf, (char *)&hdr + 2, sizeof(scewl_hdr_t) - 2, blocking);
+  if(read == INTF_NO_DATA) {
+    return SCEWL_NO_MSG;
+  }
 
-  } while (intf != CPU_INTF && intf != SSS_INTF &&                       // always valid if from CPU or SSS
-           ((hdr.tgt_id == SCEWL_BRDCST_ID && hdr.src_id == SCEWL_ID) || // ignore own broadcast
-            (hdr.tgt_id != SCEWL_BRDCST_ID && hdr.tgt_id != SCEWL_ID))); // ignore direct message to other device
+  // unpack header
+  *src_id = hdr.src_id;
+  *tgt_id = hdr.tgt_id;
+
+  // read body
+  max = hdr.len < n ? hdr.len : n;
+  read = intf_read(intf, data, max, blocking);
+
+  // throw away rest of message if too long
+  for (int i = 0; hdr.len > max && i < hdr.len - max; i++) {
+    intf_readb(intf, 0);
+  }
+
+  // report if not blocking and full message not received
+  if(read == INTF_NO_DATA || read < max) {
+    return SCEWL_NO_MSG;
+  }
 
   return max;
 }
@@ -277,12 +272,18 @@ int main() {
         // Read message from antenna
         len = read_msg(RAD_INTF, buf, &src_id, &tgt_id, sizeof(buf), 1);
 
-        if (tgt_id == SCEWL_BRDCST_ID) {
-          handle_brdcst_recv(buf, src_id, len);
-        } else if (src_id == SCEWL_FAA_ID) {
-          handle_faa_recv(buf, len);
-        } else {
-          handle_scewl_recv(buf, src_id, len);
+        if (src_id != SCEWL_ID) { // ignore our own outgoing messages
+          if (tgt_id == SCEWL_BRDCST_ID) {
+            // receive broadcast message
+            handle_brdcst_recv(buf, src_id, len);
+          } else if (tgt_id == SCEWL_ID) {
+            // receive unicast message
+            if (src_id == SCEWL_FAA_ID) {
+              handle_faa_recv(buf, len);
+            } else {
+              handle_scewl_recv(buf, src_id, len);
+            }
+          }
         }
       }
     }
