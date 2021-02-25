@@ -135,7 +135,7 @@ int scewl_recv(char *buf, scewl_id_t *src_id, scewl_id_t *tgt_id,
   if (blocking) {
     flags &= ~O_NONBLOCK;
   } else {
-    flags |= ~O_NONBLOCK;
+    flags |= O_NONBLOCK;
   }
   fcntl(sock, F_SETFL, flags);
 
