@@ -16,23 +16,20 @@ import logging
 import struct
 import socket
 import select
-from typing import List, NamedTuple, Optional, Dict
+from typing import List, NamedTuple, Optional, Dict, TypeVar
 
 
+Message = TypeVar('Message')
 Header = NamedTuple('Header', [('ty', bytes), ('tgt', int), ('src', int), ('len', int)])
-Message = NamedTuple('Message', [('hdr', Header), ('raw_hdr', bytes), ('body', bytes)])
+SCEWLMessage = NamedTuple('SCEWLMessage', [('hdr', Header), ('raw_hdr', bytes), ('body', bytes)])
 
 BRDCST_ID = 0
 SSS_ID = 1
 FAA_ID = 2
 
 
-class ScewlSock:
-    HDR_LEN = 8
-    SCEWL_MAGIC = b'SC'
-    MITM_MAGIC = b'MM'
-
-    def __init__(self, sock_path: str, q_len=1, log_level=logging.INFO, mode=None):
+class Sock:
+    def __init__(self, sock_path: str, q_len=1, log_level=logging.INFO, mode: int = None):
         self.sock_path = sock_path
         self.buf = b''
 
@@ -51,9 +48,7 @@ class ScewlSock:
 
         # change permissions if necessary
         if mode:
-            print(f'Changing {repr(sock_path)} to {oct(mode)}')
             os.chmod(sock_path, mode)
-            os.system(f'ls -l {sock_path}')
 
         # set up logger
         fhandler = logging.FileHandler(f'radio_waves.log')
@@ -82,8 +77,68 @@ class ScewlSock:
                 self.logger.info(f'Connection opened on {self.sock_path}')
                 self.csock, _ = self.sock.accept()
         return bool(self.csock)
-    
+
     def deserialize(self) -> Optional[Message]:
+        raise NotImplementedError
+
+    def read_msg(self) -> Optional[Message]:
+        if not self.active():
+            return None
+
+        try:
+            if self.sock_ready(self.csock):
+                data = self.csock.recv(4096)
+
+                # connection closed
+                if not data:
+                    self.close()
+                    return None
+
+                self.buf += data
+
+            return self.deserialize()
+        except (ConnectionResetError, BrokenPipeError):
+            # cleanly handle forced closed connection
+            self.close()
+            return None
+
+    def read_all_msgs(self) -> List[Message]:
+        msgs = []
+        msg = self.read_msg()
+        while msg:
+            msgs.append(msg)
+            msg = self.read_msg()
+        return msgs
+
+    def serialize(self, msg: Message) -> bytes:
+        raise NotImplementedError
+
+    def send_msg(self, msg: Message) -> bool:
+        if not self.active():
+            return False
+
+        try:
+            self.csock.sendall(self.serialize(msg))
+            return True
+        except (ConnectionResetError, BrokenPipeError):
+            # cleanly handle forced closed connection
+            self.close()
+            return False
+
+    def close(self):
+        self.logger.warning(f'Conection closed on {self.sock_path}')
+        self.csock = None
+        self.buf = b''
+
+class ScewlSock(Sock):
+    HDR_LEN = 8
+    SCEWL_MAGIC = b'SC'
+    MITM_MAGIC = b'MM'
+
+    def __init__(self, sock_path: str, q_len=1, log_level=logging.INFO, mode: int = None):
+        super().__init__(sock_path, q_len, log_level, mode)
+
+    def deserialize(self) -> Optional[SCEWLMessage]:
         # find start of message
         while len(self.buf) > 2 and self.buf[:2] not in (self.SCEWL_MAGIC, self.MITM_MAGIC):
             self.logger.warning(f'Bad magic {repr(self.buf[:2])}: scanning...')
@@ -104,62 +159,19 @@ class ScewlSock:
                 # remove message from buffer
                 self.buf = self.buf[self.HDR_LEN + hdr.len:]
                 self.logger.debug(f'Read message {msg}')
-                return Message(hdr, raw_hdr, msg)
+                return SCEWLMessage(hdr, raw_hdr, msg)
         return None
-
-    def read_msg(self) -> Optional[Message]:
-        if not self.active():
-            return None
-
-        try:
-            if self.sock_ready(self.csock):
-                data = self.csock.recv(4096)
-
-                # connection closed
-                if not data:
-                    self.close()
-                    return None
-                
-                self.buf += data
-
-            return self.deserialize()
-        except (ConnectionResetError, BrokenPipeError):
-            # cleanly handle forced closed connection
-            self.close()
-            return None
-
-    def read_all_msgs(self) -> List[Message]:
-        msgs = []
-        msg = self.read_msg()
-        while msg:
-            msgs.append(msg)
-            msg = self.read_msg()
-        return msgs
-
-    def send_msg(self, msg: Message) -> bool:
-        if not self.active():
-            return False
-
-        try:
-            hdr, raw_hdr, body = msg
-            raw_msg = raw_hdr + body
-            self.logger.info(f'Sending {len(raw_msg)}B {hdr.src}->({hdr.tgt}@{self.sock_path}): '
-                             f'{repr(raw_msg)}')
-            self.csock.sendall(raw_msg)
-            return True
-        except (ConnectionResetError, BrokenPipeError):
-            # cleanly handle forced closed connection
-            self.close()
-            return False
-
-    def close(self):
-        self.logger.warning(f'Conection closed on {self.sock_path}')
-        self.csock = None
-        self.buf = b''
+    
+    def serialize(self, msg: SCEWLMessage) -> bytes:
+        hdr, raw_hdr, body = msg
+        raw_msg = raw_hdr + body
+        self.logger.info(f'Sending {len(raw_msg)}B {hdr.src}->({hdr.tgt}@{self.sock_path}): '
+                            f'{repr(raw_msg)}')
+        return raw_msg
 
 
 class MitM(ScewlSock):
-    def forward(self, msgs) -> List[Message]:
+    def forward(self, msgs) -> List[SCEWLMessage]:
         # add the messages to the Sock fifo and poll for new messages
         for msg in msgs:
             self.send_msg(msg)
@@ -173,8 +185,27 @@ class MitM(ScewlSock):
         # just return messages if sock not available
         return msgs + recvd_msgs
 
+class SCSock(Sock):
+    def __init__(self, sock_path: str, q_len=1, log_level=logging.INFO, mode: int = None):
+        super().__init__(sock_path, q_len, log_level, mode)
+    
+    def deserialize(self) -> bytes:
+        buf = self.buf
+        self.buf = b''
+        return buf
+    
+    def serialize(self, msg: bytes) -> bytes:
+        return msg
 
-def poll(socks: Dict[int, ScewlSock], mitm: MitM, faa: ScewlSock, sock: ScewlSock):
+def poll_sc_sock(probe_sock: SCSock, recvr_sock: SCSock):
+    if probe_sock.active():
+        msg = probe_sock.read_msg()
+
+        # send message to receiver
+        if recvr_sock.active():
+            recvr_sock.send_msg(msg)
+
+def poll_scewl_sock(sock: ScewlSock, socks: Dict[int, ScewlSock], mitm: MitM):
     msgs = sock.read_all_msgs()
 
     # try to forward messages through the MitM interface
@@ -189,7 +220,7 @@ def poll(socks: Dict[int, ScewlSock], mitm: MitM, faa: ScewlSock, sock: ScewlSoc
         # otherwise broadcast to all SEDs
         else:
             for sock in socks.values():
-                if sock != faa:
+                if sock != socks[FAA_ID]:
                     sock.send_msg(msg)
 
 
@@ -199,6 +230,8 @@ def parse_args():
     parser.add_argument('end_id', type=int, help='End of expected SCEWL ID range')
     parser.add_argument('faa_sock', help='Name of FAA transceiver socket (will be created)')
     parser.add_argument('mitm_sock', help='Name of MitM transceiver socket (will be created)')
+    parser.add_argument('sc_probe_sock', help='Name of side-channel probe socket (will be created)')
+    parser.add_argument('sc_recvr_sock', help='Name of side-channel receiver socket (will be created)')
     parser.add_argument('--sock-root', default='/socks', help='Path to the socket directory')
 
     return parser.parse_args()
@@ -206,22 +239,27 @@ def parse_args():
 
 def main():
     args = parse_args()
-    start_id, end_id, faa_sock, mitm_sock, sock_root = \
-        args.start_id, args.end_id, args.faa_sock, args.mitm_sock, args.sock_root
+    start_id, end_id, faa_sock, mitm_sock, sc_probe_sock, sc_recvr_sock, sock_root = \
+        args.start_id, args.end_id, args.faa_sock, args.mitm_sock, args.sc_probe_sock, \
+        args.sc_recvr_sock, args.sock_root
 
     # open all sockets
     socks = {sid: ScewlSock(os.path.join(sock_root, f'antenna_{sid}.sock'))
              for sid in range(start_id, end_id)}
-    faa = ScewlSock(os.path.join(sock_root, faa_sock), mode=0o777)
-    socks[FAA_ID] = faa
+    socks[FAA_ID] = ScewlSock(os.path.join(sock_root, faa_sock), mode=0o777)
     mitm = MitM(os.path.join(sock_root, mitm_sock), mode=0o777)
+    sc_probe = SCSock(os.path.join(sock_root, sc_probe_sock), mode=0o777)
+    sc_recvr = SCSock(os.path.join(sock_root, sc_recvr_sock), mode=0o777)
 
     # poll forever
     while True:
-        # poll each socket
+        # poll side channel sockets
+        poll_sc_sock(sc_probe, sc_recvr)
+
+        # poll each SCEWL socket
         for sock in socks.values():
             if sock.active():
-                poll(socks, mitm, faa, sock)
+                poll_scewl_sock(sock, socks, mitm)
 
 
 if __name__ == '__main__':

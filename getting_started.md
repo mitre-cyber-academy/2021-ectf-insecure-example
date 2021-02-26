@@ -159,7 +159,8 @@ Containers in deployment:
 
 ### 4) Launch deployment
 ```
-make deploy DEPLOYMENT=echo START_ID=10 END_ID=12 SOCK_ROOT=$PWD/socks FAA_SOCK=faa.sock MITM_SOCK=mitm.sock
+make deploy DEPLOYMENT=echo START_ID=10 END_ID=12 SOCK_ROOT=$PWD/socks FAA_SOCK=faa.sock \
+    MITM_SOCK=mitm.sock SC_PROBE_SOCK=sc_probe.sock SC_RECVR_SOCK=sc_recvr.sock
 ```
 
 This will launch `ectf/ectf-radio:latest` (from Docker Hub) and `echo/sss:latest`
@@ -175,6 +176,8 @@ Arguments:
    the backend Unix sockets to
  * `FAA_SOCK` - The name of the Unix socket for the FAA transceiver to attach to
  * `MITM_SOCK` - The name of the Unix socket for the MitM transceiver to attach to
+ * `SC_PROBE_SOCK` - The name of the Unix socket for the side-channel probe to attach to
+ * `SC_RECVR_SOCK` - The name of the Unix socket for the side-channel receiver to attach to
 
  Running containers:
   * `ectf/ectf-radio:latest` - the radio waves emulator

@@ -31,21 +31,24 @@ export SC_RECVR_SOCK=sc_recvr.sock
 # create deployment
 make create_deployment
 make add_sed SED=echo_server SCEWL_ID=10 NAME=echo_server
-make add_sed SED=echo_client SCEWL_ID=11 NAME=echo_client CUSTOM='TGT_ID=10'
+
+# create side-channel collector
+make create_sc_container SCEWL_ID=10 NAME=echo_server
 
 # launch deployment
 make deploy
 
-# launch transceiver in background
-python3 tools/faa.py $SOCK_ROOT/$FAA_SOCK &
+# launch collector
+python3 tools/sc_receiver.py socks/$SC_RECVR_SOCK example.traces --max-file-size 100000 &
 
 # launch seds detatched
-make launch_sed_d NAME=echo_server SCEWL_ID=10
-sleep 1
-make launch_sed_d NAME=echo_client SCEWL_ID=11
+make launch_sed_sc NAME=echo_server SCEWL_ID=10
 
-# bring transceiver back into foreground
+# bring side channel receiver back up
 fg
+
+# wait for collection
+sleep 2
 
 echo "Killing docker containers..."
 docker kill $(docker ps -q) 2>/dev/null

@@ -24,6 +24,8 @@ export FAA_SOCK=faa.sock
 export MITM_SOCK=mitm.sock
 export START_ID=10
 export END_ID=11
+export SC_PROBE_SOCK=sc_probe.sock
+export SC_RECVR_SOCK=sc_recvr.sock
 
 # create deployment
 make create_deployment

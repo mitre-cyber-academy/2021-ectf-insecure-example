@@ -31,8 +31,6 @@ if [ -z "$GDB" ]; then
 
     sleep 1
 
-    echo $CONTROLLER
-
     # launch CPU
     docker run ${CPU_DOCK_OPT} \
         -v ${SOCK_ROOT}/sss.sock:/socks/sss.sock \

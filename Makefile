@@ -77,9 +77,9 @@ deploy: launch_radio_d launch_sss_d
 
 # launch the radio waves emulator
 launch_radio:
-	$(call check_defined, DEPLOYMENT FAA_SOCK MITM_SOCK START_ID END_ID SOCK_ROOT)
+	$(call check_defined, DEPLOYMENT FAA_SOCK MITM_SOCK START_ID END_ID SC_PROBE_SOCK SC_RECVR_SOCK SOCK_ROOT)
 	docker run $(DOCKOPT) -v $(SOCK_ROOT):/socks ectf/ectf-radio \
-		python3 -u /radio.py $(START_ID) $(END_ID) $(FAA_SOCK) $(MITM_SOCK)
+		python3 -u /radio.py $(START_ID) $(END_ID) $(FAA_SOCK) $(MITM_SOCK) $(SC_PROBE_SOCK) $(SC_RECVR_SOCK)
 
 # launch the radio waves emulator detatched
 launch_radio_d: DOCKOPT=-d
