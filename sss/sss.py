@@ -63,7 +63,7 @@ class SSS:
         _, _, _, _, dev_id, op = struct.unpack('<HHHHHH', data)
 
         # requesting repeat transaction
-        if dev_id in self.devs and self.devs[dev_id] == op:
+        if dev_id in self.devs and self.devs[dev_id].status == op:
             resp_op = ALREADY
             logging.info(f'{dev_id}:already {"Registered" if op == REG else "Deregistered"}')
         # record transaction

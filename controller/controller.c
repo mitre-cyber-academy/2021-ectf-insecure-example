@@ -28,6 +28,8 @@ char int2char(uint8_t i) {
 // message buffer
 char buf[SCEWL_MAX_DATA_SZ];
 
+int registered = 0;
+
 
 int read_msg(intf_t *intf, char *data, scewl_id_t *src_id, scewl_id_t *tgt_id,
              size_t n, int blocking) {
@@ -134,17 +136,13 @@ int handle_faa_send(char* data, uint16_t len) {
 }
 
 
-int handle_registration(char* msg) {
+void handle_registration(char* msg) {
   scewl_sss_msg_t *sss_msg = (scewl_sss_msg_t *)msg;
-  if (sss_msg->op == SCEWL_SSS_REG) {
-    return sss_register();
+  if (sss_msg->op == SCEWL_SSS_REG && sss_register()) {
+    registered = 1;
+  } else if (sss_msg->op == SCEWL_SSS_DEREG && sss_deregister()) {
+    registered = 0;
   }
-  else if (sss_msg->op == SCEWL_SSS_DEREG) {
-    return sss_deregister();
-  }
-
-  // bad op
-  return 0;
 }
 
 
@@ -206,7 +204,7 @@ int sss_deregister() {
 }
 
 int main() {
-  int registered = 0, len;
+  int len;
   scewl_hdr_t hdr;
   uint16_t src_id, tgt_id;
 
@@ -242,7 +240,7 @@ int main() {
     read_msg(CPU_INTF, buf, &hdr.src_id, &hdr.tgt_id, sizeof(buf), 1);
 
     if (hdr.tgt_id == SCEWL_SSS_ID) {
-      registered = handle_registration(buf);
+      handle_registration(buf);
     }
 
     // server while registered
@@ -257,7 +255,7 @@ int main() {
         if (tgt_id == SCEWL_BRDCST_ID) {
           handle_brdcst_send(buf, len);
         } else if (tgt_id == SCEWL_SSS_ID) {
-          registered = handle_registration(buf);
+          handle_registration(buf);
         } else if (tgt_id == SCEWL_FAA_ID) {
           handle_faa_send(buf, len);
         } else {
