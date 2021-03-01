@@ -137,7 +137,7 @@ int handle_faa_send(char* data, uint16_t len);
  * args:
  *   op - pointer to the operation message received by the CPU
  */
-int handle_registration(char* op);
+void handle_registration(char* op);
 
 /*
  * sss_register

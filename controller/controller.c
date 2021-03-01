@@ -136,7 +136,7 @@ int handle_faa_send(char* data, uint16_t len) {
 }
 
 
-int handle_registration(char* msg) {
+void handle_registration(char* msg) {
   scewl_sss_msg_t *sss_msg = (scewl_sss_msg_t *)msg;
   if (sss_msg->op == SCEWL_SSS_REG && sss_register()) {
     registered = 1;
