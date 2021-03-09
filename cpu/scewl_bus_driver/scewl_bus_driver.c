@@ -128,7 +128,7 @@ int full_read(int sock, void *vbuf, int n) {
 int scewl_recv(char *buf, scewl_id_t *src_id, scewl_id_t *tgt_id,
                size_t n, int blocking) {
   scewl_hdr_t hdr;
-  int res, max, bread, flags, dummy;
+  int res=SCEWL_OK, max, bread, flags, dummy;
 
   // set blocking
   flags = fcntl(sock, F_GETFL, 0);
