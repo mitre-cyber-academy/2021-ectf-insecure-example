@@ -83,7 +83,8 @@ int scewl_register() {
 
 
 int scewl_deregister() {
-  scewl_id_t dummy; // we don't care about src/tgt here
+  scewl_id_t src_id;
+  scewl_id_t tgt_id;
   scewl_sss_msg_t msg;
 
   msg.dev_id = SCEWL_ID;
@@ -95,11 +96,14 @@ int scewl_deregister() {
     return SCEWL_ERR;
   }
 
-  // receive response
-  if (scewl_recv((char *)&msg, &dummy, &dummy, sizeof(msg), 1) == SCEWL_ERR) {
-    fprintf(logfp, "failed to deregister\n");
-    return SCEWL_ERR;
-  }
+  // Wait until an SSS message is returned
+  do {
+    // receive response
+    if (scewl_recv((char *)&msg, &src_id, &tgt_id, sizeof(msg), 1) == SCEWL_ERR) {
+      fprintf(logfp, "failed to deregister\n");
+      return SCEWL_ERR;
+    }
+  } while (src_id != SCEWL_SSS_ID);
 
   // op should be DEREG on success
   if (msg.op == SCEWL_SSS_DEREG) {
